@@ -148,12 +148,6 @@ func New(config *Config) (*Manager, error) {
 		}
 	}
 
-	// TODO(stevvooe): Reported address of manager is plumbed to listen addr
-	// for now, may want to make this separate. This can be tricky to get right
-	// so we need to make it easy to override. This needs to be the address
-	// through which agent nodes access the manager.
-	dispatcherConfig.Addr = tcpAddr
-
 	err = os.MkdirAll(filepath.Dir(config.ProtoAddr["unix"]), 0700)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create socket directory: %v", err)
@@ -197,9 +191,19 @@ func New(config *Config) (*Manager, error) {
 			} else if err != nil {
 				return nil, err
 			}
+			if proto == "tcp" {
+				// in case of 0 port
+				tcpAddr = l.Addr().String()
+			}
 			listeners[proto] = l
 		}
 	}
+
+	// TODO(stevvooe): Reported address of manager is plumbed to listen addr
+	// for now, may want to make this separate. This can be tricky to get right
+	// so we need to make it easy to override. This needs to be the address
+	// through which agent nodes access the manager.
+	dispatcherConfig.Addr = tcpAddr
 
 	raftCfg := raft.DefaultNodeConfig()
 
@@ -236,6 +240,11 @@ func New(config *Config) (*Manager, error) {
 	}
 
 	return m, nil
+}
+
+// Addr returns tcp address on which remote api listens.
+func (m *Manager) Addr() string {
+	return m.listeners["tcp"].Addr().String()
 }
 
 // Run starts all manager sub-systems and the gRPC server at the configured

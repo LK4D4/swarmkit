@@ -101,6 +101,17 @@ type Node struct {
 	managerRoleCh        chan struct{}
 }
 
+// RemoteAPIAddr returns address on which remote manager api listens.
+// Returns nil if node is not manager.
+func (n *Node) RemoteAPIAddr() (string, error) {
+	n.RLock()
+	defer n.RUnlock()
+	if n.manager == nil {
+		return "", fmt.Errorf("node is not manager")
+	}
+	return n.manager.Addr(), nil
+}
+
 // NewNode returns new Node instance.
 func NewNode(c *NodeConfig) (*Node, error) {
 	if err := os.MkdirAll(c.StateDir, 0700); err != nil {
@@ -631,7 +642,7 @@ func (n *Node) runManager(ctx context.Context, securityConfig *ca.SecurityConfig
 				go func(ready chan struct{}) {
 					select {
 					case <-ready:
-						n.remotes.Observe(api.Peer{NodeID: n.nodeID, Addr: n.config.ListenRemoteAPI}, 5)
+						n.remotes.Observe(api.Peer{NodeID: n.nodeID, Addr: m.Addr()}, 5)
 					case <-connCtx.Done():
 					}
 				}(ready)
