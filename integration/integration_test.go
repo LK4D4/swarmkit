@@ -23,9 +23,13 @@ func pollClusterReady(t *testing.T, c *testCluster, numWorker, numManager int) {
 		if err != nil {
 			return err
 		}
-		var mCount int
+		var mCount, wCount int
 		var leaderFound bool
 		for _, n := range res.Nodes {
+			// if node is stopped/crashed - skip it
+			if c.nodes[n.ID].node == nil {
+				continue
+			}
 			if n.Status.State != api.NodeStatus_READY {
 				return fmt.Errorf("node %s with role %s isn't ready, status %s, message %s", n.ID, n.Spec.Role, n.Status.State, n.Status.Message)
 			}
@@ -50,12 +54,12 @@ func pollClusterReady(t *testing.T, c *testCluster, numWorker, numManager int) {
 				if n.ManagerStatus != nil {
 					return fmt.Errorf("worker node %s should not have manager status, returned %s", n.ID, n.ManagerStatus)
 				}
+				wCount++
 			}
 		}
 		if !leaderFound {
 			return fmt.Errorf("leader of cluster is not found")
 		}
-		wCount := len(res.Nodes) - mCount
 		if mCount != numManager {
 			return fmt.Errorf("unexpected number of managers: %d, expected %d", mCount, numManager)
 		}
@@ -238,8 +242,7 @@ func TestDemotePromoteLeader(t *testing.T) {
 	pollClusterReady(t, cl, numWorker, numManager)
 }
 
-// TODO: improve test to demote the leader in case of 2 remaining managers
-func TestDemoteToSingleManager(t *testing.T) {
+func TestDemoteToSingleManagerAndBack(t *testing.T) {
 	numWorker, numManager := 1, 3
 	cl := newCluster(t, numWorker, numManager)
 	defer func() {
@@ -260,5 +263,36 @@ func TestDemoteToSingleManager(t *testing.T) {
 	// agents 3, managers 1
 	numWorker++
 	numManager--
+	pollClusterReady(t, cl, numWorker, numManager)
+
+	for _, n := range cl.nodes {
+		if !n.config.IsManager {
+			require.NoError(t, cl.SetNodeRole(n.node.NodeID(), api.NodeRoleManager))
+			numWorker--
+			numManager++
+			pollClusterReady(t, cl, numWorker, numManager)
+		}
+	}
+}
+
+func TestRestartLeader(t *testing.T) {
+	numWorker, numManager := 1, 3
+	cl := newCluster(t, numWorker, numManager)
+	defer func() {
+		require.NoError(t, cl.Stop())
+	}()
+
+	// stop leader
+	leader, err := cl.Leader()
+	require.NoError(t, err)
+	require.NoError(t, leader.Stop())
+	// agents 1, managers 2
+	numManager--
+	pollClusterReady(t, cl, numWorker, numManager)
+
+	require.NoError(t, leader.StartAgain(cl.ctx))
+
+	// agents 1, managers 3
+	numManager++
 	pollClusterReady(t, cl, numWorker, numManager)
 }

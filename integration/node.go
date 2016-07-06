@@ -52,8 +52,9 @@ func newTestNode(isManager bool, joinAddr string) (*testNode, error) {
 	}, nil
 }
 
-// Stop stops the node and removes its state directory.
-func (n *testNode) Stop() error {
+// Stop stops the node, preserving state dir and config. Node can be started
+// again later
+func (n *TestNode) Stop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), opsTimeout)
 	defer cancel()
 	if err := n.node.Stop(ctx); err != nil {
@@ -61,6 +62,32 @@ func (n *testNode) Stop() error {
 			return fmt.Errorf("error stop manager %s: %v", n.node.NodeID(), err)
 		}
 		return fmt.Errorf("error stop worker %s: %v", n.node.NodeID(), err)
+	}
+	n.node = nil
+	return nil
+}
+
+// StartAgain recreates and starts underlying node.
+func (n *TestNode) StartAgain(ctx context.Context) error {
+	node, err := agent.NewNode(n.config)
+	if err != nil {
+		return err
+	}
+	n.node = node
+	return n.node.Start(ctx)
+}
+
+// Destroy stops the node and removes its state directory.
+func (n *TestNode) Destroy() error {
+	if n.node != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), opsTimeout)
+		defer cancel()
+		if err := n.node.Stop(ctx); err != nil {
+			if n.config.IsManager {
+				return fmt.Errorf("error stop manager %s: %v", n.node.NodeID(), err)
+			}
+			return fmt.Errorf("error stop worker %s: %v", n.node.NodeID(), err)
+		}
 	}
 	return os.RemoveAll(n.stateDir)
 }

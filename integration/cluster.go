@@ -44,7 +44,7 @@ func newTestCluster() *testCluster {
 func (c *testCluster) Stop() error {
 	c.cancel()
 	for _, n := range c.nodes {
-		if err := n.Stop(); err != nil {
+		if err := n.Destroy(); err != nil {
 			return err
 		}
 	}
@@ -62,7 +62,8 @@ func (c *testCluster) Stop() error {
 func (c *testCluster) RandomManager() *testNode {
 	var managers []*testNode
 	for _, n := range c.nodes {
-		if n.config.IsManager {
+		// exclude workers and stopped nodes
+		if n.config.IsManager && n.node != nil {
 			managers = append(managers, n)
 		}
 	}
@@ -214,7 +215,7 @@ func (c *testCluster) RemoveNode(id string) error {
 		}
 
 	}
-	if err := node.Stop(); err != nil {
+	if err := node.Destroy(); err != nil {
 		return err
 	}
 	delete(c.nodes, id)
