@@ -162,7 +162,7 @@ func TestNodeOps(t *testing.T) {
 	pollClusterReady(t, cl, numWorker, numManager)
 }
 
-func TestDemotePromote(t *testing.T) {
+func TestDemotePromoteDemote(t *testing.T) {
 	numWorker, numManager := 1, 3
 	cl := newCluster(t, numWorker, numManager)
 	defer func() {
@@ -190,9 +190,15 @@ func TestDemotePromote(t *testing.T) {
 	numWorker--
 	numManager++
 	pollClusterReady(t, cl, numWorker, numManager)
+
+	require.NoError(t, cl.SetNodeRole(manager.node.NodeID(), api.NodeRoleWorker))
+	// agents 2, managers 2
+	numWorker++
+	numManager--
+	pollClusterReady(t, cl, numWorker, numManager)
 }
 
-func TestPromoteDemote(t *testing.T) {
+func TestPromoteDemotePromote(t *testing.T) {
 	numWorker, numManager := 1, 3
 	cl := newCluster(t, numWorker, numManager)
 	defer func() {
@@ -217,6 +223,12 @@ func TestPromoteDemote(t *testing.T) {
 	// agents 1, managers 3
 	numWorker++
 	numManager--
+	pollClusterReady(t, cl, numWorker, numManager)
+
+	require.NoError(t, cl.SetNodeRole(worker.node.NodeID(), api.NodeRoleManager))
+	// agents 0, managers 4
+	numWorker--
+	numManager++
 	pollClusterReady(t, cl, numWorker, numManager)
 }
 
