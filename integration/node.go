@@ -55,6 +55,11 @@ func newTestNode(isManager bool, joinAddr string) (*testNode, error) {
 // Stop stops the node, preserving state dir and config. Node can be started
 // again later
 func (n *TestNode) Stop() error {
+	addr, err := n.node.RemoteAPIAddr()
+	if err != nil {
+		return err
+	}
+	n.config.ListenRemoteAPI = addr
 	ctx, cancel := context.WithTimeout(context.Background(), opsTimeout)
 	defer cancel()
 	if err := n.node.Stop(ctx); err != nil {

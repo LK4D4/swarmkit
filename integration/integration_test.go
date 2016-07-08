@@ -289,7 +289,6 @@ func TestDemoteToSingleManagerAndBack(t *testing.T) {
 }
 
 func TestRestartLeader(t *testing.T) {
-	t.Skip("restart doesn't work now")
 	numWorker, numManager := 1, 3
 	cl := newCluster(t, numWorker, numManager)
 	defer func() {
@@ -308,5 +307,41 @@ func TestRestartLeader(t *testing.T) {
 
 	// agents 1, managers 3
 	numManager++
+	pollClusterReady(t, cl, numWorker, numManager)
+}
+
+func TestRestartCluster(t *testing.T) {
+	numWorker, numManager := 1, 5
+	cl := newCluster(t, numWorker, numManager)
+	defer func() {
+		require.NoError(t, cl.Stop())
+	}()
+
+	for _, n := range cl.nodes {
+		if n.config.IsManager {
+			require.NoError(t, n.Stop())
+		}
+	}
+
+	for _, n := range cl.nodes {
+		require.NoError(t, n.StartAgain(cl.ctx))
+	}
+
+	pollClusterReady(t, cl, numWorker, numManager)
+}
+
+func TestRestartClusterOneByOne(t *testing.T) {
+	numWorker, numManager := 1, 5
+	cl := newCluster(t, numWorker, numManager)
+	defer func() {
+		require.NoError(t, cl.Stop())
+	}()
+
+	for _, n := range cl.nodes {
+		if n.config.IsManager {
+			require.NoError(t, n.Stop())
+			require.NoError(t, n.StartAgain(cl.ctx))
+		}
+	}
 	pollClusterReady(t, cl, numWorker, numManager)
 }
